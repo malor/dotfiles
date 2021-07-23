@@ -111,7 +111,7 @@ font:
     #   - (macOS) Menlo
     #   - (Linux/BSD) monospace
     #   - (Windows) Consolas
-    family: JetBrainsMono
+    family: JetBrainsMono Nerd Font
 
     # The `style` can be specified to pick a specific face.
     # style: Regular
@@ -402,7 +402,7 @@ font:
 #   - (Linux/BSD) user login shell
 #   - (Windows) powershell
 shell:
-  program: fish
+  program: /usr/local/bin/fish
   args:
     - --login
     - -c
