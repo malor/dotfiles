@@ -378,9 +378,9 @@ set_vim_plug(
             capabilities = capabilities,
          })
 
-         lspconfig.pyls.setup({
+         lspconfig.pylsp.setup({
             settings = {
-               pyls = {
+               pylsp = {
                   configurationSources = {"flake8", "pycodestyle"},
                },
             },
