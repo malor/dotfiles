@@ -48,37 +48,78 @@ end)();
 --
 -- // HELPERS //
 --
+--
 
-local LSP_KIND_SIGNS = {
-   Text = "",
-   Method = "",
-   Function = "",
-   Constructor = "",
-   Field = "ﴲ",
-   Variable = "",
-   Class = "",
-   Interface = "",
-   Module = "",
-   Property = "",
-   Unit = "",
-   Value = "",
-   Enum = "",
-   EnumMember = "",
-   Keyword = "",
-   Snippet = "﬌",
-   Color = "",
-   File = "",
-   Reference = "",
-   Folder = "",
-   Constant = "",
-   Struct = "ﳤ",
-   Event = "",
-   TypeParameter = "",
+-- These symbols essentially represent "single" border style. Once Telescope
+-- supports built-in borders, we can probably replace them with just "single"
+-- string.
+local FLOAT_BORDER = {"┌", "─", "┐", "│", "┘", "─", "└", "│"}
+
+-- Nerd Font icons for LSP completion item kinds.
+local LSP_COMPLETION_ITEM_KIND_ICONS = {
+   Text             = "",
+   Method           = "",
+   Function         = "",
+   Constructor      = "",
+   Field            = "ﰠ",
+   Variable         = "",
+   Class            = "ﴯ",
+   Interface        = "",
+   Module           = "",
+   Property         = "ﰠ",
+   Unit             = "",
+   Value            = "",
+   Enum             = "",
+   Keyword          = "",
+   Snippet          = "",
+   Color            = "",
+   File             = "",
+   Reference        = "",
+   Folder           = "",
+   EnumMember       = "",
+   Constant         = "",
+   Struct           = "ﳤ",
+   Event            = "",
+   Operator         = "",
+   TypeParameter    = "",
 }
+
+-- Nerd Font icons for LSP symbol item kinds.
+local LSP_SYMBOL_KIND_ICONS = {
+   File             = "",
+   Module           = "",
+   Namespace        = ":",
+   Package          = "",
+   Class            = "ﴯ",
+   Method           = "",
+   Property         = "ﰠ",
+   Field            = "ﰠ",
+   Constructor      = "",
+   Enum             = "",
+   Interface        = "",
+   Function         = "",
+   Variable         = "",
+   Constant         = "",
+   String           = "",
+   Number           = "#",
+   Boolean          = "",
+   Array            = "",
+   Object           = "",
+   Key              = "",
+   Null             = "␀",
+   EnumMember       = "",
+   Struct           = "ﳤ",
+   Event            = "",
+   Operator         = "",
+   TypeParameter    = "",
+}
+
+local LSP_CAPABILITIES = vim.lsp.protocol.make_client_capabilities()
+local LSP_ON_ATTACH_FUNCTIONS = {}
 
 local function set_keymap(mode, lhs, rhs, opts)
    opts = vim.tbl_extend("force", {noremap=true, silent=true}, opts or {})
-   return vim.api.nvim_set_keymap(mode, lhs , rhs, opts)
+   return vim.api.nvim_set_keymap(mode, lhs, rhs, opts)
 end
 
 local function set_vim_plug(path, plugins, setup)
@@ -99,56 +140,132 @@ local function set_vim_plug(path, plugins, setup)
    for _, repo in ipairs(start) do pcall(setup[repo]) end
 end
 
+local function lsp_progress_status()
+   local messages = vim.lsp.util.get_progress_messages()
+   local function isempty(value) return value == nil or value == "" end
 
---
--- // GENERAL //
---
+   -- In order to avoid cluttering we're showing only the last message since
+   -- the last one probably contains most actual information.
+   for _, msg in pairs(messages) do
+      if msg.progress then
+         local status = {}
 
-if vim.env.COLORTERM == "truecolor" or vim.env.COLORTERM == "24bit" then
-   vim.opt.termguicolors = true
+         if not isempty(msg.title) then
+            table.insert(status, msg.title)
+         end
+
+         if not isempty(msg.message) then
+            table.insert(status, msg.message)
+         end
+
+         if not isempty(msg.percentage) then
+            table.insert(status, string.format("(%.0f%%%%)", msg.percentage))
+         end
+
+         if not vim.tbl_isempty(status) then
+            return vim.trim(table.concat(status, " - "))
+         end
+      end
+   end
 end
 
-vim.g.mapleader = ";"                                      -- change leader to ; from the default of /
-vim.opt.autochdir = true                                   -- change cwd to current file
-vim.opt.ignorecase = true                                  -- case insensitive search
-vim.opt.lazyredraw = true                                  -- do not redraw screen on macros execution, etc
-vim.opt.mouse = "a"                                        -- enable mouse support in all Vim modes
-vim.opt.showmode = false                                   -- do not show Vim mode, lualine shows it
-vim.opt.timeout = false                                    -- no timeout on keybindings (aka mappings)
-vim.opt.scrolloff = 3                                      -- start scrolling 3 lines ahead
-vim.opt.sidescrolloff = 3                                  -- start scrolling 3 columns ahead
-vim.opt.shortmess:append("c")                              -- supress 'match X of Y' message
-vim.opt.smartcase = true                                   -- match uppercase in the search string
-vim.opt.showbreak = "↪"                                    -- character to mark wrapped line
-vim.opt.visualbell = true                                  -- flash screen instead of beep
-vim.opt.title = true                                       -- propagate useful info to window title
-vim.opt.completeopt = {
-   "menuone",                                              -- show completions even if there's only a single item
-   "noselect",                                             -- do not auto select completions
-   "noinsert",                                             -- do not auto insert completions
-}
+
+--
+-- // OPTIONS //
+--
+
+vim.g.mapleader = ";"
+vim.opt.termguicolors = true
+vim.opt.ignorecase = true
+vim.opt.smartcase = true
+vim.opt.mouse = "n"
+vim.opt.showmode = false
+vim.opt.timeout = false
+vim.opt.scrolloff = 3
+vim.opt.sidescrolloff = 3
+vim.opt.shortmess:append("c")
+vim.opt.title = true
+vim.opt.completeopt = {"menu", "menuone", "noselect", "noinsert"}
 vim.opt.updatetime = 300
-vim.opt.colorcolumn = {"80", "100"}                        -- set ruler at 80 & 100 characters
-vim.opt.cursorline = true                                  -- highlight the line with the cursor
-vim.opt.list = true                                        -- show unprintable characters
-vim.opt.listchars = {                                      -- set unprintable characters
-   tab = "»·",                                             -- tab character
-   lead = "·",                                             -- leading whitespaces
-   trail = "·",                                            -- trailing whitespaces
-   nbsp = "⎵",
+vim.opt.colorcolumn = {"81", "101"}
+vim.opt.cursorline = true
+vim.opt.list = true
+vim.opt.listchars = {
+   tab      = " ",
+   lead     = "·",
+   trail    = "·",
+   nbsp     = "⎵",
+   extends  = "⟩",
+   precedes = "⟨",
 }
-vim.opt.foldenable = false                                 -- no code folding, I hate it
-vim.opt.wrap = false                                       -- do not wrap lines visually
-vim.opt.number = true                                      -- show line numbers
-vim.opt.signcolumn = "yes"                                 -- always show sign column
-vim.opt.expandtab = true                                   -- insert space instead the tab
-vim.opt.formatoptions:append("r")                          -- auto insert comment leader on <enter>
-vim.opt.swapfile = false                                   -- do not create swap files
-vim.opt.shiftwidth = 4                                     -- shift lines by 4 spaces
-vim.opt.softtabstop = 4                                    -- insert spaces instead of tabs
-vim.opt.spelllang = {"en", "ru"}                           -- languages to spellcheck
-vim.opt.tabstop = 8                                        -- set tab width
-vim.opt.undofile = true                                    -- persistent undo (survives Vim restart)
+vim.opt.showbreak = "﬌ "
+vim.opt.foldenable = false
+vim.opt.wrap = false
+vim.opt.number = true
+vim.opt.signcolumn = "yes"
+vim.opt.expandtab = true
+vim.opt.formatoptions:append("r")
+vim.opt.formatoptions:append("n")
+vim.opt.formatoptions:remove("t")
+vim.opt.swapfile = false
+vim.opt.shiftwidth = 4
+vim.opt.softtabstop = 4
+vim.opt.spelllang = {"en", "uk"}
+vim.opt.tabstop = 4
+vim.opt.undofile = true
+vim.opt.clipboard = "unnamedplus"
+
+
+--
+-- // LSP FRAMEWORK //
+--
+
+vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(
+   vim.lsp.handlers.hover, {
+      border = FLOAT_BORDER,
+      focusable = false,
+   }
+)
+
+vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(
+   vim.lsp.handlers.signature_help, {
+      border = FLOAT_BORDER,
+      focusable = false,
+   }
+)
+
+
+--
+-- // DIAGNOSTIC FRAMEWORK //
+--
+
+vim.diagnostic.config({
+   virtual_text = false,
+   severity_sort = true,
+   float = {
+      border = FLOAT_BORDER,
+      border = "single",
+      focusable = false,
+   },
+})
+
+vim.fn.sign_define({
+   -- Set custom icons for diagnostics. Unfortunately these signs aren't
+   -- defined until diagnostics are shown for the first time, that's why
+   -- specifying `texthl` in addition to `text` is required; otherwise proper
+   -- highlight groups won't be applied.
+   {name = "DiagnosticSignError", text = "", texthl = "DiagnosticSignError"},
+   {name = "DiagnosticSignWarn",  text = "", texthl = "DiagnosticSignWarn"},
+   {name = "DiagnosticSignInfo",  text = "", texthl = "DiagnosticSignInfo"},
+   {name = "DiagnosticSignHint",  text = "", texthl = "DiagnosticSignHint"},
+})
+
+vim.api.nvim_exec([[
+   augroup NVIM_DIAGNOSTIC
+      autocmd!
+      autocmd CursorHold * lua vim.diagnostic.open_float(0, {scope="cursor"})
+   augroup END
+]], false)
 
 
 --
@@ -156,6 +273,7 @@ vim.opt.undofile = true                                    -- persistent undo (s
 --
 
 set_keymap("n", "<leader>3", "<cmd>set spell!<cr>")
+set_keymap("n", "<leader>i", "<cmd>lua vim.diagnostic.setqflist()<CR>")
 
 set_keymap("", "<leader>y", '"+y')
 set_keymap("", "<leader>p", '"+p')
@@ -172,9 +290,11 @@ set_vim_plug(
    function(plug)
       -- Fast asynchronous completion manager that works with omnicomplete,
       -- word completion and built-in LSP.
-      plug("hrsh7th/nvim-compe")
+      plug("hrsh7th/nvim-cmp")
+      plug("hrsh7th/cmp-buffer")
+      plug("hrsh7th/cmp-nvim-lsp")
+      plug("hrsh7th/cmp-nvim-lua")
       plug("hrsh7th/vim-vsnip")
-      plug("hrsh7th/vim-vsnip-integ")
 
       -- Telescope is general fuzzy finder over lists that could be used to
       -- find files, grep projects, show LSP symbols, etc. One generic
@@ -186,30 +306,27 @@ set_vim_plug(
 
       -- LSP and its goodies.
       plug("neovim/nvim-lspconfig")
-      plug("nvim-lua/lsp-status.nvim")
-      plug("nvim-lua/lsp_extensions.nvim")
-      plug("onsails/lspkind-nvim")
       plug("ray-x/lsp_signature.nvim")
       plug("simrat39/rust-tools.nvim")
+      plug("kosayoda/nvim-lightbulb")
 
       -- Tree-sitter is a parser generator tool and an incremental parsing
       -- library. NeoVim can leverage its functionality in various ways:
-      -- semantic syntax highlighting, indentation or navigation.
+      -- semantic syntax highlighting, indentation, navigation, etc.
       plug("nvim-treesitter/nvim-treesitter", {["do"] = ":TSUpdate"})
       plug("nvim-treesitter/playground")
       plug("p00f/nvim-ts-rainbow")
 
       plug("arcticicestudio/nord-vim", {branch = "develop"})
-      -- plug("shaunsingh/nord.nvim")
-      plug("morhetz/gruvbox")
+      plug("folke/tokyonight.nvim")
 
-      plug("hoob3rt/lualine.nvim")
+      plug("nvim-lualine/lualine.nvim")
+      plug("ahmedkhalf/project.nvim")
       plug("tpope/vim-sleuth")
-      plug("preservim/nerdtree")
       plug("mg979/vim-visual-multi")
-      plug("simrat39/symbols-outline.nvim")
+      plug("stevearc/aerial.nvim")
       plug("tpope/vim-fugitive")
-      plug("mhinz/vim-signify")
+      plug("lewis6991/gitsigns.nvim")
       plug("Valloric/ListToggle")
       plug("norcalli/nvim-colorizer.lua")
       plug("ryanoasis/vim-devicons")
@@ -221,147 +338,148 @@ set_vim_plug(
       plug("chrisbra/csv.vim", {["for"] = {"csv"}})
    end,
    {
-      ["hrsh7th/nvim-compe"] = function()
-         require("compe").setup({
-            preselect = "disable",
-            source = {
-               path = true,
-               buffer = true,
-               nvim_lsp = true,
-               nvim_lua = true,
-               omni = {
-                  filetypes = {"css", "scss", "less", "stylus"},
-               },
+      ["hrsh7th/nvim-cmp"] = function()
+         local cmp = require("cmp")
+         cmp.setup({
+            completion = {
+               completeopt = vim.o.completeopt,
+            },
+
+            documentation = {
+               border = FLOAT_BORDER,
+               winhighlight = "NormalFloat:NormalFloat,FloatBorder:FloatBorder",
+            },
+
+            snippet = {
+               expand = function(args)
+                  vim.fn["vsnip#anonymous"](args.body)
+               end
+            },
+
+            preselect = cmp.PreselectMode.None,
+
+            mapping = {
+               ["<C-p>"] = cmp.mapping.select_prev_item(),
+               ["<C-n>"] = cmp.mapping.select_next_item(),
+               ["<C-d>"] = cmp.mapping.scroll_docs(-4),
+               ["<C-f>"] = cmp.mapping.scroll_docs(4),
+               ["<C-Space>"] = cmp.mapping.complete(),
+               ["<C-e>"] = cmp.mapping.close(),
+               ["<C-y>"] = cmp.mapping.confirm(),
+               ["<CR>"] = cmp.mapping.confirm(),
+            },
+
+            formatting = {
+               format = function(_, vim_item)
+                  vim_item.kind = string.format(
+                     "%s %s",
+                     LSP_COMPLETION_ITEM_KIND_ICONS[vim_item.kind],
+                     vim_item.kind
+                  )
+                  return vim_item
+               end
+            },
+
+            sources = {
+               { name = "nvim_lsp" },
+               { name = "nvim_lua" },
+               { name = "buffer" , keyword_length = 3 },
             },
          })
+      end,
 
-         -- Apparently, 'ins-completion-menu' won't go away unless completion
-         -- keybindings go through either 'compe#confirm' or 'compe#close'.
-         set_keymap("i", "<cr>", "compe#confirm('<cr>')", {expr = true})
-         set_keymap("i", "<c-y>", "compe#confirm('<c-y>')", {expr = true})
-         set_keymap("i", "<c-e>", "compe#close('<c-e>')", {expr = true})
+      ["hrsh7th/cmp-nvim-lsp"] = function()
+         require("cmp_nvim_lsp").update_capabilities(LSP_CAPABILITIES)
       end,
 
       ["nvim-telescope/telescope.nvim"] = function()
          local telescope = require("telescope")
          local telescope_actions = require("telescope.actions")
-         local telescope_utils = require("telescope.utils")
          local telescope_builtin = require("telescope.builtin")
 
          telescope.setup({
             defaults = {
                mappings = {
                   i = {
-                     -- I don't need Vim modes in Telescope, so anytime Esc is pressed I
-                     -- want Telescope to close instead of going into Normal mode.
-                     ["<esc>"] = telescope_actions.close
+                     -- I don't need Vim modes in Telescope, so anytime Esc is
+                     -- pressed I want to close Telescope instead of entering
+                     -- Normal mode.
+                     ["<esc>"] = telescope_actions.close,
                   },
+               },
+               borderchars = {
+                  -- Telescope doesn't support built-in borders yet :'(
+                  FLOAT_BORDER[2],
+                  FLOAT_BORDER[4],
+                  FLOAT_BORDER[6],
+                  FLOAT_BORDER[8],
+                  FLOAT_BORDER[1],
+                  FLOAT_BORDER[3],
+                  FLOAT_BORDER[5],
+                  FLOAT_BORDER[7],
                },
             }
          })
          telescope.load_extension("fzy_native")
+         telescope.load_extension("projects")
 
-         -- This opens telescope's grepper but with CWD pointing to a git root.
-         -- The idea is to ensure no matter which directory I'm in, the grep
-         -- will search throughout the whole project.
-         function _G.telescope_git_grep()
-            local cwd = vim.loop.cwd()
-            local root, exitcode, _ = telescope_utils.get_os_command_output(
-               {"git", "rev-parse", "--show-toplevel"}, cwd
-            )
-            if exitcode == 0 then cwd = root[1] end
-            return telescope_builtin.live_grep({cwd = cwd})
+         function _G.telescope_file_browser_current_file()
+            local cwd = vim.fn.expand("%:p:h")
+            return telescope_builtin.file_browser({cwd = cwd})
          end
 
+         set_keymap("n", "<leader>1", "<cmd>call v:lua.telescope_file_browser_current_file()<cr>")
          set_keymap("n", "<c-p>", "<cmd>Telescope git_files<cr>")
-         set_keymap("n", "<leader>g", "<cmd>call v:lua.telescope_git_grep()<cr>")
-      end,
+         set_keymap("n", "<leader>g", "<cmd>Telescope live_grep<cr>")
+         set_keymap("n", "<leader>G", "<cmd>Telescope grep_string<cr>")
+         set_keymap("n", "<leader>/", "<cmd>Telescope current_buffer_fuzzy_find<cr>")
+         set_keymap("n", "<leader>?", "<cmd>Telescope resume<cr>")
+         set_keymap("n", "<leader>i", "<cmd>Telescope diagnostics bufnr=0<cr>")
 
-      ["neovim/nvim-lspconfig"] = function()
-         vim.lsp.handlers["textDocument/publishDiagnostics"] = vim.lsp.with(
-            vim.lsp.diagnostic.on_publish_diagnostics, {
-               virtual_text = false,
-               underline = true,
-               signs = true,
-            }
-         )
-         vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(
-            vim.lsp.handlers.hover, {
-               border = "single",
-            }
-         )
-         vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(
-            vim.lsp.handlers.signature_help, {
-               border = "single",
-            }
-         )
-         vim.fn.sign_define("LspDiagnosticsSignError", {text = ""})
-         vim.fn.sign_define("LspDiagnosticsSignWarning", {text = ""})
-         vim.fn.sign_define("LspDiagnosticsSignInformation", {text = ""})
-         vim.fn.sign_define("LspDiagnosticsSignHint", {text = ""})
-
-         local lspconfig = require("lspconfig")
-         local lsp_status = {
-            on_attach = function(...) end,
-            capabilities = vim.lsp.protocol.make_client_capabilities(),
-         }
-
-         if pcall(require, "lsp-status") then
-            lsp_status = require("lsp-status")
-         end
-
-         local capabilities = lsp_status.capabilities
-         capabilities.textDocument.completion.completionItem.snippetSupport = true
-         capabilities.textDocument.completion.completionItem.resolveSupport = {
-            properties = {
-               "documentation",
-               "detail",
-               "additionalTextEdits",
-           }
-         }
-
-         local on_attach = function(client, bufnr)
-            local function buf_set_keymap(...) vim.api.nvim_buf_set_keymap(bufnr, ...) end
-            local function buf_set_option(...) vim.api.nvim_buf_set_option(bufnr, ...) end
-            local opts = {noremap=true, silent=true}
-
-            buf_set_option("omnifunc", "v:lua.vim.lsp.omnifunc")
-
-            buf_set_keymap("n", "<leader>D", "<cmd>lua vim.lsp.buf.declaration()<CR>", opts)
-            buf_set_keymap("n", "<leader>d", "<cmd>lua vim.lsp.buf.definition()<CR>", opts)
-            buf_set_keymap("n", "<leader>h", "<cmd>lua vim.lsp.buf.hover()<CR>", opts)
-            buf_set_keymap("n", "<leader>t", "<cmd>lua vim.lsp.buf.document_symbol()<CR>", opts)
-            buf_set_keymap("n", "<leader>T", "<cmd>lua vim.lsp.buf.workspace_symbol()<CR>", opts)
-            buf_set_keymap("n", "<leader>r", "<cmd>lua vim.lsp.buf.references()<CR>", opts)
-            buf_set_keymap("n", "<leader>k", "<cmd>lua vim.lsp.buf.signature_help()<CR>", opts)
-            buf_set_keymap("n", "<leader>i", "<cmd>lua vim.lsp.diagnostic.set_loclist()<CR>", opts)
-            buf_set_keymap("n", "<leader>I", "<cmd>lua vim.lsp.diagnostic.show_line_diagnostics({ border = 'single' })<CR>", opts)
-            buf_set_keymap("n", "[d", "<cmd>lua vim.lsp.diagnostic.goto_prev({ popup_opts = { border = 'single' }})<CR>", opts)
-            buf_set_keymap("n", "]d", "<cmd>lua vim.lsp.diagnostic.goto_next({ popup_opts = { border = 'single' }})<CR>", opts)
-            buf_set_keymap("n", "<leader>A", "<cmd>lua vim.lsp.buf.code_action()<CR>", opts)
-            buf_set_keymap("n", "<leader>R", "<cmd>lua vim.lsp.buf.rename()<CR>", opts)
-
-            if client.resolved_capabilities.document_formatting then
-               buf_set_keymap("n", "<leader>F", "<cmd>lua vim.lsp.buf.formatting()<CR>", opts)
-            elseif client.resolved_capabilities.document_range_formatting then
-               buf_set_keymap("n", "<leader>F", "<cmd>lua vim.lsp.buf.range_formatting()<CR>", opts)
+         table.insert(LSP_ON_ATTACH_FUNCTIONS, function(client, bufnr)
+            local function buf_set_keymap(mode, lhs, rhs)
+               return vim.api.nvim_buf_set_keymap(bufnr, mode, lhs, rhs, {noremap=true, silent=true})
             end
 
             -- These are Telescope overwrites to provide a better UI than
             -- standard NeoVim does.
-            buf_set_keymap("n", "<leader>d", "<cmd>Telescope lsp_definitions<CR>", opts)
-            buf_set_keymap("n", "<leader>t", "<cmd>Telescope lsp_document_symbols<CR>", opts)
-            buf_set_keymap("n", "<leader>T", "<cmd>Telescope lsp_workspace_symbols<CR>", opts)
-            buf_set_keymap("n", "<leader>r", "<cmd>Telescope lsp_references<CR>", opts)
-            buf_set_keymap("n", "<leader>i", "<cmd>Telescope lsp_document_diagnostics<CR>", opts)
-            buf_set_keymap("n", "<leader>A", "<cmd>Telescope lsp_code_actions<CR>", opts)
+            buf_set_keymap("n", "<leader>d", "<cmd>Telescope lsp_definitions<CR>")
+            buf_set_keymap("n", "<leader>t", "<cmd>Telescope lsp_document_symbols<CR>")
+            buf_set_keymap("n", "<leader>T", "<cmd>Telescope lsp_workspace_symbols<CR>")
+            buf_set_keymap("n", "<leader>r", "<cmd>Telescope lsp_references<CR>")
+            buf_set_keymap("n", "<leader>A", "<cmd>Telescope lsp_code_actions<CR>")
+         end)
+      end,
+
+      ["neovim/nvim-lspconfig"] = function()
+         local lspconfig = require("lspconfig")
+         local config = lspconfig.util.default_config
+
+         config.capabilities = LSP_CAPABILITIES
+         config.on_attach = function(client, bufnr)
+            vim.bo.omnifunc = "v:lua.vim.lsp.omnifunc"
+
+            local function buf_set_keymap(mode, lhs, rhs)
+               return vim.api.nvim_buf_set_keymap(bufnr, mode, lhs, rhs, {noremap=true, silent=true})
+            end
+
+            buf_set_keymap("n", "<leader>D", "<cmd>lua vim.lsp.buf.declaration()<CR>")
+            buf_set_keymap("n", "<leader>d", "<cmd>lua vim.lsp.buf.definition()<CR>")
+            buf_set_keymap("n", "<leader>h", "<cmd>lua vim.lsp.buf.hover()<CR>")
+            buf_set_keymap("n", "<leader>t", "<cmd>lua vim.lsp.buf.document_symbol()<CR>")
+            buf_set_keymap("n", "<leader>T", "<cmd>lua vim.lsp.buf.workspace_symbol()<CR>")
+            buf_set_keymap("n", "<leader>r", "<cmd>lua vim.lsp.buf.references()<CR>")
+            buf_set_keymap("n", "<leader>A", "<cmd>lua vim.lsp.buf.code_action()<CR>")
+            buf_set_keymap("n", "<leader>R", "<cmd>lua vim.lsp.buf.rename()<CR>")
+
+            if client.resolved_capabilities.document_formatting then
+               buf_set_keymap("n", "<leader>F", "<cmd>lua vim.lsp.buf.formatting()<CR>")
+            elseif client.resolved_capabilities.document_range_formatting then
+               buf_set_keymap("n", "<leader>F", "<cmd>lua vim.lsp.buf.range_formatting()<CR>")
+            end
 
             if client.resolved_capabilities.document_highlight then
                vim.api.nvim_exec([[
-                  hi LspReferenceRead  guibg=#3b4252
-                  hi LspReferenceText  guibg=#3b4252
-                  hi LspReferenceWrite guibg=#3b4252
-
                   augroup NVIM_LSP_HIGHLIGHT_REFERENCES
                      autocmd! * <buffer>
                      autocmd CursorHold <buffer> lua vim.lsp.buf.document_highlight()
@@ -370,84 +488,65 @@ set_vim_plug(
                ]], false)
             end
 
-            lsp_status.on_attach(client, bufnr)
+            for _, fn in ipairs(LSP_ON_ATTACH_FUNCTIONS) do
+               fn(client, bufnr)
+            end
          end
 
+         lspconfig.rust_analyzer.setup({})
          lspconfig.pyright.setup({
-            on_attach = on_attach,
-            capabilities = capabilities,
-         })
-
-         lspconfig.pylsp.setup({
             settings = {
-               pylsp = {
-                  configurationSources = {"flake8", "pycodestyle"},
+               pyright = {
+                  disableOrganizeImports = true,
+                  analysis = {
+                     autoImportCompletions = false,
+                  },
                },
             },
-            on_attach = on_attach,
-            capabilities = capabilities,
          })
-
-         if pcall(require, "rust-tools") then
-            require("rust-tools").setup({tools = {autoSetHints = false, hover_with_actions = false}})
-         end
-
-         lspconfig.rust_analyzer.setup({
-            on_attach = function(client, bufnr)
-               on_attach(client, bufnr)
-
-               if pcall(require, "lsp_extensions") then
-                  -- rust_analyzer support an awesome extension that evaluates types and
-                  -- show them using virtual text overlay. I want to invoke that
-                  -- behaviour every time the cursor is hold on the line.
-                  vim.api.nvim_exec([[
-                     augroup NVIM_LSP_EXTENSIONS_INLAY_HINTS
-                        autocmd! * <buffer>
-                        autocmd CursorHold,CursorHoldI <buffer> lua require("lsp_extensions").inlay_hints({only_current_line = true})
-                     augroup END
-                  ]], false)
-               end
-            end,
-            capabilities = capabilities,
-         })
-
-         lspconfig.clangd.setup({
-            init_options = {
-               clangdFileStatus = true,
-            },
-            handlers = lsp_status.extensions.clangd.setup(),
-            on_attach = on_attach,
-            capabilities = capabilities,
-         })
-
-         lspconfig.bashls.setup({on_attach = on_attach, capabilities = capabilities})
-         lspconfig.denols.setup({on_attach = on_attach, capabilities = capabilities})
-         lspconfig.tsserver.setup({on_attach = on_attach, capabilities = capabilities})
-      end,
-
-      ["nvim-lua/lsp-status.nvim"] = function()
-         local lsp_status = require("lsp-status")
-
-         lsp_status.config({
-            kind_labels = LSP_KIND_SIGNS,
-            status_symbol = "",
-            diagnostics = false,
-         })
-         lsp_status.register_progress()
-      end,
-
-      ["onsails/lspkind-nvim"] = function()
-         require("lspkind").init({symbol_map = LSP_KIND_SIGNS})
+         -- lspconfig.pylsp.setup({
+         --    settings = {
+         --       pylsp = {
+         --          configurationSources = {"flake8"},
+         --          plugins = {
+         --             jedi_completion = {
+         --                include_params = true
+         --             },
+         --          },
+         --       },
+         --    },
+         -- })
+         lspconfig.clangd.setup({})
+         lspconfig.bashls.setup({})
+         lspconfig.denols.setup({})
+         lspconfig.tsserver.setup({})
+         lspconfig.yamlls.setup({})
+         lspconfig.cssls.setup({cmd = {"vscode-css-languageserver", "--stdio"}})
+         lspconfig.html.setup({cmd = {"vscode-html-languageserver", "--stdio"}})
+         lspconfig.jsonls.setup({cmd = {"vscode-json-languageserver", "--stdio"}})
       end,
 
       ["ray-x/lsp_signature.nvim"] = function()
-         -- The only reason this plugin is used is probably because it shows
-         -- currently active parameter in signature. Should not be needed once
-         -- https://github.com/neovim/neovim/issues/14444 is closed.
-         require("lsp_signature").on_attach({
+         require("lsp_signature").setup({
             bind = true,
-            handler_opts = {border = "single"},
+            handler_opts = {
+               border = FLOAT_BORDER,
+            },
+            doc_lines = 0,
+            fix_pos = true,
             hint_enable = false,
+         })
+      end,
+
+      ["simrat39/rust-tools.nvim"] = function()
+         require("rust-tools").setup({
+            tools = {
+               autoSetHints = true,
+               hover_with_actions = false,
+               hover_actions = {
+                  border = FLOAT_BORDER,
+               },
+            },
          })
       end,
 
@@ -458,38 +557,10 @@ set_vim_plug(
 
       ["nvim-treesitter/nvim-treesitter"] = function()
          require("nvim-treesitter.configs").setup({
-            ensure_installed = "maintained",
-            highlight = {enable = true, disable = {"rust"}},
-            indent = {enable = false},
+            highlight = {enable = true},
             playground = {enable = true},
+            rainbow = {enable = true},
          })
-      end,
-
-      ["p00f/nvim-ts-rainbow"] = function()
-         function _G.nvim_ts_rainbow_setup()
-            require("nvim-treesitter.configs").setup({
-               rainbow = {
-                  enable = true,
-                  colors = {
-                     vim.g.terminal_color_9,
-                     vim.g.terminal_color_10,
-                     vim.g.terminal_color_11,
-                     vim.g.terminal_color_12,
-                     vim.g.terminal_color_13,
-                     vim.g.terminal_color_14,
-                  },
-               },
-            })
-         end
-
-         -- Since the setup function pipes in colors from a colorscheme, it has
-         -- to be reevaluated every time a colorscheme changed.
-         vim.api.nvim_exec([[
-            augroup NVIM_TREESITTER_RAINBOW
-               autocmd!
-               autocmd ColorScheme * call v:lua.nvim_ts_rainbow_setup()
-            augroup END
-         ]], false)
       end,
 
       ["arcticicestudio/nord-vim"] = function()
@@ -498,17 +569,44 @@ set_vim_plug(
 
          function _G.colorscheme_nord_enhancements()
             local patches = {
-               -- Treesitter gaps.
-               "hi default link rstTSTitle markdownH1",
-               "hi default link rstTSPunctSpecial markdownH1",
-               "hi default link rstTSFuncBuiltin Type",
-               "hi default link yamlTSField Keyword",
+               "hi! default link TabLineSel lualine_a_normal",
+
+               -- Use NeoVim 0.6+ diagnostic names.
+               "hi! default link DiagnosticHint LspDiagnosticsDefaultHint",
+               "hi! default link DiagnosticInfo LspDiagnosticsDefaultInformation",
+               "hi! default link DiagnosticWarn LspDiagnosticsDefaultWarning",
+               "hi! default link DiagnosticError LspDiagnosticsDefaultError",
+               "hi! default link DiagnosticUnderlineHint LspDiagnosticsUnderlineHint",
+               "hi! default link DiagnosticUnderlineInfo LspDiagnosticsUnderlineInformation",
+               "hi! default link DiagnosticUnderlineWarn LspDiagnosticsUnderlineWarning",
+               "hi! default link DiagnosticUnderlineError LspDiagnosticsUnderlineError",
+
+               -- Enhance syntax highlighting via tree-sitter
+               "hi! default link TSConstBuiltin TSType",
+               "hi! default link TSTypeBuiltin TSFunction",
+               "hi default link TSURI TSKeyword",
+               "hi default link TSTitle TSNote",
+               "hi default link rstTSPunctSpecial TSNote",
+               "hi default link rstTSFuncBuiltin TSKeyword",
+               "hi default link rstTSConstant TSAnnotation",
+               "hi default link yamlTSField TSFunction",
+               "hi default link yamlTSType TSAnnotation",
+
+               -- nvim-cmp gaps
+               "hi CmpItemAbbrMatch gui=bold",
+               "hi! default link FloatBorder NormalFloat",
+
+               -- nvim-ts-rainbow
+               "hi rainbowcol1 guifg=#81a1c1",
+               "hi rainbowcol2 guifg=#8fbcbb",
+               "hi rainbowcol3 guifg=#d08770",
+               "hi rainbowcol4 guifg=#5e81ac",
+               "hi rainbowcol5 guifg=#ebcb8b",
+               "hi rainbowcol6 guifg=#a3be8c",
+               "hi rainbowcol7 guifg=#b48ead",
 
                -- Emphasize matched parts.
                "hi TelescopeMatching guifg=#88c0d0 guibg=#4c566a guisp=none",
-
-               -- Use custom background for floating windows.
-               "hi NormalFloat guibg=#4c566a",
 
                -- https://github.com/arcticicestudio/nord-vim/pull/182
                "hi default link mailQuoted1 helpBar",
@@ -536,70 +634,81 @@ set_vim_plug(
          vim.api.nvim_command("colorscheme nord")
       end,
 
-      ["shaunsingh/nord.nvim"] = function()
-         -- require("nord").set()
+
+      ["folke/tokyonight.nvim"] = function()
+         vim.g.tokyonight_italic_keywords = false
       end,
 
-      ["hoob3rt/lualine.nvim"] = function()
+      ["nvim-lualine/lualine.nvim"] = function()
+         local breadcrump_sep = " ⟩ "
+
          require("lualine").setup({
-            options = {
-               theme = vim.g.colors_name,
-            },
             sections = {
-               lualine_x = {
-                  function()
-                     return vim.trim(require("lsp-status").status_progress())
-                  end,
-                  {"vim.b.lsp_current_function"},
-                  {"diagnostics", sources = {"nvim_lsp"}},
-                  {"filetype"},
+               lualine_a = {"mode"},
+               lualine_b = {
                   {
-                     -- Nowadays UTF-8 is the most widespread text encoding.
-                     -- Since this is something most users are dealing with
-                     -- 99.9% of the time, there's no need to show unless it's
-                     -- different.
-                     "encoding", condition = function()
+                     "filename",
+                     path = 1,
+                     separator = vim.trim(breadcrump_sep),
+                     fmt = function(str)
+                        local path_separator = package.config:sub(1, 1)
+                        return str:gsub(path_separator, breadcrump_sep)
+                     end
+                  },
+                  { "aerial", sep = breadcrump_sep },
+               },
+               lualine_c = {},
+               lualine_x = {
+                  {
+                     function() return lsp_progress_status() or "" end,
+                     icon = "",
+                  },
+               },
+               lualine_y = {
+                  "diagnostics",
+                  {
+                     "encoding",
+                     cond = function()
+                        -- UTF-8 is the de-facto standard encoding and is what
+                        -- most users expect by default. There's no need to
+                        -- show encoding unless it's something else.
                         local fenc = vim.opt.fenc:get()
                         return string.len(fenc) > 0 and string.lower(fenc) ~= "utf-8"
                      end,
                   },
-                  {"fileformat"},
+                  "filetype",
+                  "fileformat",
+                  "progress",
                },
+               lualine_z = { "location" },
             },
          })
       end,
 
-      ["preservim/nerdtree"] = function()
-         vim.g.NERDTreeQuitOnOpen = 1
-         vim.g.NERDTreeShowHidden = 1
-         vim.g.NERDTreeMinimalUI = 1
-
-         vim.api.nvim_exec([[
-            function! MyNERDTreeToggleVCS()
-               let path = expand('%:p')
-
-               execute ':NERDTreeToggleVCS'
-
-               " Find and show currently open file in the file explorer. It's the primary
-               " reason why this home grown function exists in the first place.
-               if exists('g:NERDTree') && g:NERDTree.IsOpen() && filereadable(path)
-                  execute ':NERDTreeFind' . path
-               endif
-            endfunction
-
-            command! -n=? -complete=dir -bar MyNERDTreeToggleVCS :call MyNERDTreeToggleVCS()
-         ]], false)
-
-         set_keymap("n", "<leader>1", "<cmd>MyNERDTreeToggleVCS<cr>")
+      ["ahmedkhalf/project.nvim"] = function ()
+         require("project_nvim").setup()
       end,
 
-      ["simrat39/symbols-outline.nvim"] = function()
-         set_keymap("n", "<leader>2", "<cmd>SymbolsOutline<cr>")
+      ["stevearc/aerial.nvim"] = function()
+         vim.g.aerial = {
+            manage_folds = false,
+            min_width = 35,
+            max_width = 35,
+            highlight_on_jump = 0,
+            close_on_select = true,
+            icons = LSP_SYMBOL_KIND_ICONS,
+         }
+         table.insert(LSP_ON_ATTACH_FUNCTIONS, require("aerial").on_attach)
+         set_keymap("n", "<leader>2", "<cmd>AerialToggle<cr>")
       end,
 
-      ["mhinz/vim-signify"] = function()
-         vim.g.signify_sign_add = "│"
-         vim.g.signify_sign_change = "│"
+      ["lewis6991/gitsigns.nvim"] = function()
+         require("gitsigns").setup({
+            preview_config = {
+               border = FLOAT_BORDER,
+               focusable = false,
+            },
+         })
       end,
 
       ["Valloric/ListToggle"] = function()
@@ -635,6 +744,7 @@ vim.api.nvim_exec([[
       autocmd BufReadPost .babelrc setlocal filetype=json
       autocmd BufReadPost .eslintrc setlocal filetype=json
       autocmd BufReadPost *.fish setlocal filetype=fish
+      autocmd BufReadPost *.rasi setlocal filetype=css
    augroup END
 
    augroup PYTHON
@@ -642,3 +752,16 @@ vim.api.nvim_exec([[
       autocmd FileType python setlocal comments+=b:#:    " sphinx (#:) comments
    augroup END
 ]], false)
+
+
+--
+-- // SOURCE EXTRA CONFIGURATIONS //
+--
+
+for _, name in ipairs({vim.fn.hostname(), "local"}) do
+   local path = string.format("%s/init.%s.lua", vim.fn.stdpath("config"), name)
+
+   if vim.fn.filereadable(path) == 1 then
+      vim.cmd(string.format("source %s", path))
+   end
+end
