@@ -345,9 +345,11 @@ set_vim_plug(
                completeopt = vim.o.completeopt,
             },
 
-            documentation = {
-               border = FLOAT_BORDER,
-               winhighlight = "NormalFloat:NormalFloat,FloatBorder:FloatBorder",
+            window = {
+               documentation = {
+                  border = FLOAT_BORDER,
+                  winhighlight = "NormalFloat:NormalFloat,FloatBorder:FloatBorder",
+               },
             },
 
             snippet = {
