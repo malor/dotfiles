@@ -562,6 +562,15 @@ set_vim_plug(
             highlight = {enable = true},
             playground = {enable = true},
             rainbow = {enable = true},
+            incremental_selection = {
+              enable = true,
+              keymaps = {
+                init_selection = "gnn",
+                node_incremental = "grn",
+                scope_incremental = "grc",
+                node_decremental = "grm",
+              },
+            },
          })
       end,
 
@@ -692,15 +701,16 @@ set_vim_plug(
       end,
 
       ["stevearc/aerial.nvim"] = function()
-         vim.g.aerial = {
-            manage_folds = false,
+         local aerial = require("aerial")
+         aerial.setup({
             min_width = 35,
             max_width = 35,
             highlight_on_jump = 0,
             close_on_select = true,
+            show_guides = true,
             icons = LSP_SYMBOL_KIND_ICONS,
-         }
-         table.insert(LSP_ON_ATTACH_FUNCTIONS, require("aerial").on_attach)
+         })
+         table.insert(LSP_ON_ATTACH_FUNCTIONS, aerial.on_attach)
          set_keymap("n", "<leader>2", "<cmd>AerialToggle<cr>")
       end,
 
