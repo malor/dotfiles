@@ -391,7 +391,7 @@ set_vim_plug(
       end,
 
       ["hrsh7th/cmp-nvim-lsp"] = function()
-         require("cmp_nvim_lsp").update_capabilities(LSP_CAPABILITIES)
+         require("cmp_nvim_lsp").default_capabilities(LSP_CAPABILITIES)
       end,
 
       ["nvim-telescope/telescope.nvim"] = function()
@@ -474,13 +474,13 @@ set_vim_plug(
             buf_set_keymap("n", "<leader>A", "<cmd>lua vim.lsp.buf.code_action()<CR>")
             buf_set_keymap("n", "<leader>R", "<cmd>lua vim.lsp.buf.rename()<CR>")
 
-            if client.resolved_capabilities.document_formatting then
+            if client.server_capabilities.document_formatting then
                buf_set_keymap("n", "<leader>F", "<cmd>lua vim.lsp.buf.formatting()<CR>")
-            elseif client.resolved_capabilities.document_range_formatting then
+            elseif client.server_capabilities.document_range_formatting then
                buf_set_keymap("n", "<leader>F", "<cmd>lua vim.lsp.buf.range_formatting()<CR>")
             end
 
-            if client.resolved_capabilities.document_highlight then
+            if client.server_capabilities.document_highlight then
                vim.api.nvim_exec([[
                   augroup NVIM_LSP_HIGHLIGHT_REFERENCES
                      autocmd! * <buffer>
@@ -703,14 +703,15 @@ set_vim_plug(
       ["stevearc/aerial.nvim"] = function()
          local aerial = require("aerial")
          aerial.setup({
-            min_width = 35,
-            max_width = 35,
+            layout = {
+               min_width = 35,
+               max_width = 35,
+            },
             highlight_on_jump = 0,
             close_on_select = true,
             show_guides = true,
             icons = LSP_SYMBOL_KIND_ICONS,
          })
-         table.insert(LSP_ON_ATTACH_FUNCTIONS, aerial.on_attach)
          set_keymap("n", "<leader>2", "<cmd>AerialToggle<cr>")
       end,
 
