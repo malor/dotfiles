@@ -8,5 +8,6 @@ set -xg BROWSER firefox         # prefer firefox as default browser
 set -xg CLICOLOR 1              # turn on colors for some BSD tools
 
 if test -n "$DESKTOP_SESSION"
-    set -x (gnome-keyring-daemon --start | string split "=")
+    set -xg GNOME_KEYRING_CONTROL {$XDG_RUNTIME_DIR}/keyring
+    set -xg SSH_AUTH_SOCK {$XDG_RUNTIME_DIR}/keyring/ssh
 end
