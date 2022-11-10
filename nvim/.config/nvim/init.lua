@@ -317,7 +317,7 @@ set_vim_plug(
       plug("nvim-treesitter/playground")
       plug("p00f/nvim-ts-rainbow")
 
-      plug("arcticicestudio/nord-vim", {branch = "develop"})
+      plug("arcticicestudio/nord-vim")
       plug("folke/tokyonight.nvim")
 
       plug("nvim-lualine/lualine.nvim")
