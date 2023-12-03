@@ -523,11 +523,13 @@ set_vim_plug(
          lspconfig.clangd.setup({})
          lspconfig.bashls.setup({})
          lspconfig.denols.setup({})
+         lspconfig.gopls.setup({})
          lspconfig.tsserver.setup({})
          lspconfig.yamlls.setup({})
          lspconfig.cssls.setup({cmd = {"vscode-css-languageserver", "--stdio"}})
          lspconfig.html.setup({cmd = {"vscode-html-languageserver", "--stdio"}})
          lspconfig.jsonls.setup({cmd = {"vscode-json-languageserver", "--stdio"}})
+         lspconfig.zls.setup({})
       end,
 
       ["ray-x/lsp_signature.nvim"] = function()
