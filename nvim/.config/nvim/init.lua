@@ -199,6 +199,8 @@ vim.opt.listchars = {
    precedes = "⟨",
 }
 vim.opt.showbreak = "﬌ "
+vim.opt.foldmethod = "expr"
+vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
 vim.opt.foldenable = false
 vim.opt.wrap = false
 vim.opt.number = true
