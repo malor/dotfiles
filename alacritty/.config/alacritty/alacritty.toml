@@ -1,0 +1,12 @@
+[font]
+size = 13.0
+
+[font.normal]
+family = "JetBrainsMono"
+
+[shell]
+args = ["--login", "-c", "tmux attach || tmux"]
+program = "fish"
+
+[window]
+startup_mode = "Maximized"
