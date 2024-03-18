@@ -9,5 +9,5 @@ set -xg CLICOLOR 1              # turn on colors for some BSD tools
 
 if test -n "$DESKTOP_SESSION"
     set -xg GNOME_KEYRING_CONTROL {$XDG_RUNTIME_DIR}/keyring
-    set -xg SSH_AUTH_SOCK {$XDG_RUNTIME_DIR}/keyring/ssh
+    set -xg SSH_AUTH_SOCK {$XDG_RUNTIME_DIR}/gcr/ssh
 end
