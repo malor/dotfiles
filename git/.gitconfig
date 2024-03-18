@@ -1,0 +1,10 @@
+[user]
+	name = Roman Podoliaka
+	email = roman.podoliaka@gmail.com
+	signingkey = /home/malor/.ssh/id_ed25519_sk
+[gpg]
+	format = ssh
+[commit]
+	gpgsign = true
+[gpg "ssh"]
+	allowedSignersFile = /home/malor/.config/git/allowed_signers
