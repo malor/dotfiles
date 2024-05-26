@@ -141,7 +141,7 @@ local function set_vim_plug(path, plugins, setup)
 end
 
 local function lsp_progress_status()
-   local messages = vim.lsp.util.get_progress_messages()
+   local messages = vim.lsp.status()
    local function isempty(value) return value == nil or value == "" end
 
    -- In order to avoid cluttering we're showing only the last message since
