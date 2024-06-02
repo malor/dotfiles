@@ -41,6 +41,8 @@ vim.opt.listchars = {
    precedes = "⟨",
 }
 vim.opt.showbreak = "➥ "
+vim.opt.foldmethod = "expr"
+vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
 vim.opt.foldenable = false
 vim.opt.wrap = false
 vim.opt.number = true
@@ -59,7 +61,7 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.pumheight = 20
 vim.opt.mousemodel = "extend"
 
-vim.g.mapleader = " "
+vim.g.mapleader = ";"
 
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
@@ -578,6 +580,7 @@ require("lazy").setup({
             "taplo",
             "ts_ls",
             "yamlls",
+            "zls",
          }) do
             lspconfig[server_name].setup({
                capabilities = vim.deepcopy(LSP_CLIENT_CAPABILITIES),
