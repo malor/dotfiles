@@ -42,8 +42,6 @@ vim.opt.listchars = {
 }
 vim.opt.showbreak = "➥ "
 vim.opt.foldenable = false
-vim.opt.foldmethod = "expr"
-vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
 vim.opt.wrap = false
 vim.opt.number = true
 vim.opt.signcolumn = "yes"
@@ -61,7 +59,7 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.pumheight = 20
 vim.opt.mousemodel = "extend"
 
-vim.g.mapleader = ";"
+vim.g.mapleader = " "
 
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
@@ -196,6 +194,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
    callback = function(ev)
       local lsp_client = vim.lsp.get_client_by_id(ev.data.client_id)
       local lsp_methods = vim.lsp.protocol.Methods
+      local vim_lsp_buf_toggle_inlayhint = function()
+         vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = 0 }), { bufnr = 0 })
+      end
 
       for _, keymap in ipairs({
          { "n",          "gy",         vim.lsp.buf.type_definition,  "Goto type definition",            lsp_methods.textDocument_typeDefinition },
@@ -205,6 +206,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
          { "n",          "<Leader>rn", vim.lsp.buf.rename,           "Rename symbol",                   lsp_methods.textDocument_rename },
          { "n",          "<Leader>a",  vim.lsp.buf.code_action,      "Perform code action",             lsp_methods.textDocument_codeAction },
          { "i",          "<C-S>",      vim.lsp.buf.signature_help,   "Show signature",                  lsp_methods.textDocument_signatureHelp },
+         { "n",          "<Leader>H",  vim_lsp_buf_toggle_inlayhint, "Toggle inlay hints",              lsp_methods.textDocument_inlayHint },
          { "n",          "<Leader>k",  vim.lsp.buf.hover,            "Show docs for item under cursor", lsp_methods.textDocument_hover },
          { "n",          "<Leader>s",  vim.lsp.buf.document_symbol,  "Open symbol picker",              lsp_methods.textDocument_documentSymbol },
          { "n",          "<Leader>S",  vim.lsp.buf.workspace_symbol, "Open workspace symbol picker",    lsp_methods.workspace_symbol },
@@ -522,7 +524,7 @@ require("lazy").setup({
                   },
                },
             },
-            tsserver = {
+            ts_ls = {
                typescript = {
                   inlayHints = {
                      includeInlayParameterNameHints = "all",
@@ -574,9 +576,8 @@ require("lazy").setup({
             "ruff",
             "rust_analyzer",
             "taplo",
-            "tsserver",
+            "ts_ls",
             "yamlls",
-            "zls",
          }) do
             lspconfig[server_name].setup({
                capabilities = vim.deepcopy(LSP_CLIENT_CAPABILITIES),
@@ -705,10 +706,6 @@ require("lazy").setup({
       },
       config = function(self, opts)
          require("aerial").setup(opts)
-         require("aerial.config").get_icon = function(bufnr, kind, collapsed)
-            return MiniIcons.get("lsp", kind)
-         end
-
          vim.keymap.set("n", "<Leader>2", "<Cmd>AerialToggle!<Cr>")
       end,
    },
