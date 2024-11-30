@@ -36,14 +36,14 @@ vim.opt.listchars = {
    tab      = "⇥-",
    lead     = "·",
    trail    = "·",
-   nbsp     = "⎵",
+   nbsp     = "␣",
    extends  = "⟩",
    precedes = "⟨",
 }
 vim.opt.showbreak = "➥ "
-vim.opt.foldmethod = "expr"
-vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
 vim.opt.foldenable = false
+vim.opt.foldmethod = "expr"
+vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 vim.opt.wrap = false
 vim.opt.number = true
 vim.opt.signcolumn = "yes"
@@ -61,7 +61,7 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.pumheight = 20
 vim.opt.mousemodel = "extend"
 
-vim.g.mapleader = ";"
+vim.g.mapleader = " "
 
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
@@ -144,52 +144,6 @@ vim.api.nvim_create_autocmd("FileType", {
 -- // LSP FRAMEWORK //
 --
 
-vim.fn.sign_define({
-   { name = "LspCodeActionSign", text = "󰁨", texthl = "LightBulbSign" },
-})
-
-vim.api.nvim_create_augroup("MyLspCodeAction", { clear = true })
-vim.api.nvim_create_autocmd({ "CursorHold", "CursorHoldI" }, {
-   group = "MyLspCodeAction",
-   callback = function(ev)
-      local is_supported = false
-
-      for _, client in ipairs(vim.lsp.get_clients({ bufnr = ev.buf })) do
-         if client.supports_method(vim.lsp.protocol.Methods.textDocument_codeAction, { bufnr = ev.buf }) then
-            is_supported = true
-            break
-         end
-      end
-
-      if not is_supported then
-         return false
-      end
-
-      local params = vim.lsp.util.make_range_params()
-      params.context = { diagnostics = vim.lsp.diagnostic.get_line_diagnostics(ev.buf) }
-      vim.lsp.buf_request_all(ev.buf, vim.lsp.protocol.Methods.textDocument_codeAction, params, function(responses)
-         for _, response in ipairs(responses) do
-            if next(response.result or {}) then
-               vim.b[ev.buf].code_action_sign_id = vim.fn.sign_place(
-                  vim.b[ev.buf].code_action_sign_id,
-                  "",
-                  "LspCodeActionSign",
-                  ev.buf,
-                  { lnum = params.range.start.line + 1 }
-               )
-               break
-            end
-         end
-      end)
-   end,
-})
-vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
-   group = "MyLspCodeAction",
-   callback = function(ev)
-      vim.fn.sign_unplace("", { ["id"] = vim.b[ev.buf].code_action_sign_id, ["buffer"] = ev.buf })
-   end
-})
-
 vim.api.nvim_create_augroup("MyLspAttach", { clear = true })
 vim.api.nvim_create_autocmd("LspAttach", {
    group = "MyLspAttach",
@@ -197,7 +151,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
       local lsp_client = vim.lsp.get_client_by_id(ev.data.client_id)
       local lsp_methods = vim.lsp.protocol.Methods
       local vim_lsp_buf_toggle_inlayhint = function()
-         vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = 0 }), { bufnr = 0 })
+         vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = ev.buf }), { bufnr = ev.buf })
       end
 
       for _, keymap in ipairs({
@@ -205,7 +159,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
          { "n",          "gd",         vim.lsp.buf.definition,       "Goto definition",                 lsp_methods.textDocument_definition },
          { "n",          "gi",         vim.lsp.buf.implementation,   "Goto implementation",             lsp_methods.textDocument_implementation },
          { "n",          "gr",         vim.lsp.buf.references,       "Goto references",                 lsp_methods.textDocument_references },
-         { "n",          "<Leader>rn", vim.lsp.buf.rename,           "Rename symbol",                   lsp_methods.textDocument_rename },
+         { "n",          "<Leader>r",  vim.lsp.buf.rename,           "Rename symbol",                   lsp_methods.textDocument_rename },
          { "n",          "<Leader>a",  vim.lsp.buf.code_action,      "Perform code action",             lsp_methods.textDocument_codeAction },
          { "i",          "<C-S>",      vim.lsp.buf.signature_help,   "Show signature",                  lsp_methods.textDocument_signatureHelp },
          { "n",          "<Leader>H",  vim_lsp_buf_toggle_inlayhint, "Toggle inlay hints",              lsp_methods.textDocument_inlayHint },
@@ -217,10 +171,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
          if lsp_client.supports_method(keymap[5]) then
             vim.keymap.set(keymap[1], keymap[2], keymap[3], { buffer = ev.buf, desc = keymap[4] })
          end
-      end
-
-      if lsp_client.supports_method(vim.lsp.protocol.Methods.textDocument_inlayHint) then
-         vim.lsp.inlay_hint.enable(true, { bufnr = ev.buf })
       end
 
       if lsp_client.supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight) then
@@ -280,8 +230,8 @@ vim.diagnostic.config({
 -- // KEYBINDINGS //
 --
 
-vim.keymap.set("n", "<Leader>3", function() vim.wo.spell = not vim.wo.spell end)
-vim.keymap.set("n", "<Leader>d", vim.diagnostic.setloclist)
+vim.keymap.set("n", "<Leader>3", function() vim.wo.spell = not vim.wo.spell end, { desc = "Toggle spell checker" })
+vim.keymap.set("n", "<Leader>d", vim.diagnostic.setloclist, { desc = "Open diagnostic picker" })
 
 
 --
@@ -391,7 +341,6 @@ require("lazy").setup({
          { "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
          "nvim-telescope/telescope-file-browser.nvim",
          "nvim-telescope/telescope-ui-select.nvim",
-         "debugloop/telescope-undo.nvim",
       },
       config = function()
          local telescope = require("telescope")
@@ -458,28 +407,28 @@ require("lazy").setup({
                      },
                   },
                },
-               undo = {
-                  use_delta = false,
-               },
             },
          })
          telescope.load_extension("fzf")
          telescope.load_extension("projects")
          telescope.load_extension("file_browser")
          telescope.load_extension("ui-select")
-         telescope.load_extension("undo")
          telescope.load_extension("aerial")
 
          vim.keymap.set("n", "<Leader>1", function()
-            telescope.extensions.file_browser.file_browser({ path = "%:p:h" })
-         end)
-         vim.keymap.set("n", "<Leader>f", telescope_builtin.git_files)
-         vim.keymap.set("n", "<Leader>/", telescope_builtin.live_grep)
-         vim.keymap.set("n", "<Leader>.", telescope_builtin.grep_string)
-         vim.keymap.set("n", "<Leader>'", telescope_builtin.resume)
+            return telescope.extensions.file_browser.file_browser({ path = "%:p:h" })
+         end, { desc = "Open file browser at current file directory" })
+         vim.keymap.set("n", "<Leader>f", telescope_builtin.git_files, { desc = "Open file picker" })
+         vim.keymap.set("n", "<Leader>/", telescope_builtin.live_grep, { desc = "Open search in workspace directory" })
+         vim.keymap.set("n", "<Leader>.", telescope_builtin.grep_string, { desc = "Search for a string under cursor" })
+         vim.keymap.set("n", "<Leader>'", telescope_builtin.resume, { desc = "Open last picker" })
+         vim.keymap.set("n", "<Leader>?", telescope_builtin.commands, { desc = "Open command palette" })
          vim.keymap.set("n", "<Leader>d", function()
             telescope_builtin.diagnostics({ bufnr = 0, no_sign = true })
-         end)
+         end, { desc = "Open diagnostic picker" })
+         vim.keymap.set("n", "<Leader>g", function ()
+            return telescope_builtin.git_status({ expand_dir = false })
+         end, { desc = "Open changed file picker" })
 
          vim.api.nvim_create_autocmd("LspAttach", {
             group = "MyLspAttach",
@@ -574,13 +523,13 @@ require("lazy").setup({
             "html",
             "jsonls",
             "lua_ls",
+            "marksman",
             "pyright",
             "ruff",
             "rust_analyzer",
             "taplo",
             "ts_ls",
             "yamlls",
-            "zls",
          }) do
             lspconfig[server_name].setup({
                capabilities = vim.deepcopy(LSP_CLIENT_CAPABILITIES),
@@ -635,8 +584,6 @@ require("lazy").setup({
          lualine_bold = true,
       },
    },
-   { "catppuccin/nvim",       name = "catppuccin", opts = { flavour = "macchiato" } },
-   { "rebelot/kanagawa.nvim", config = true },
 
    {
       "nvim-lualine/lualine.nvim",
@@ -709,7 +656,7 @@ require("lazy").setup({
       },
       config = function(self, opts)
          require("aerial").setup(opts)
-         vim.keymap.set("n", "<Leader>2", "<Cmd>AerialToggle!<Cr>")
+         vim.keymap.set("n", "<Leader>2", "<Cmd>AerialToggle!<Cr>", { desc = "Toggle code outline" })
       end,
    },
    {
@@ -741,16 +688,16 @@ require("lazy").setup({
             -- There's no need for next/prev hunk keymaps for diff buffers
             -- since they support them natively.
             if not vim.wo.diff then
-               vim.keymap.set("n", "]c", gitsigns.next_hunk, { buffer = buffer })
-               vim.keymap.set("n", "[c", gitsigns.prev_hunk, { buffer = buffer })
+               vim.keymap.set("n", "]c", gitsigns.next_hunk, { buffer = buffer, desc = "Goto next change" })
+               vim.keymap.set("n", "[c", gitsigns.prev_hunk, { buffer = buffer, desc = "Goto previous change" })
             end
 
-            vim.keymap.set({ "n", "v" }, "<Leader>hs", gitsigns.stage_hunk, { buffer = buffer })
-            vim.keymap.set({ "n", "v" }, "<Leader>hr", gitsigns.reset_hunk, { buffer = buffer })
-            vim.keymap.set("n", "<Leader>hu", gitsigns.undo_stage_hunk, { buffer = buffer })
-            vim.keymap.set("n", "<Leader>hp", gitsigns.preview_hunk, { buffer = buffer })
-            vim.keymap.set("n", "<Leader>hb", function() gitsigns.blame_line { full = true } end, { buffer = buffer })
-            vim.keymap.set("n", "<Leader>hd", function() gitsigns.diffthis("~") end, { buffer = buffer })
+            vim.keymap.set({ "n", "v" }, "<Leader>hs", gitsigns.stage_hunk, { buffer = buffer, desc = "Stage current hunk"})
+            vim.keymap.set({ "n", "v" }, "<Leader>hr", gitsigns.reset_hunk, { buffer = buffer, desc = "Revert current hunk" })
+            vim.keymap.set("n", "<Leader>hu", gitsigns.undo_stage_hunk, { buffer = buffer, desc = "Unstage current hunk" })
+            vim.keymap.set("n", "<Leader>hp", gitsigns.preview_hunk, { buffer = buffer, desc = "Show current hunk" })
+            vim.keymap.set("n", "<Leader>hb", function() gitsigns.blame_line { full = true } end, { buffer = buffer, desc = "Blame current line" })
+            vim.keymap.set("n", "<Leader>hd", function() gitsigns.diffthis("~") end, { buffer = buffer, desc = "Show current file diff" })
          end,
       }
    },
@@ -760,7 +707,6 @@ require("lazy").setup({
          css = { css = true },
          stylus = { css = true },
       },
-      enabled = vim.opt.termguicolors:get(),
    },
    {
       "echasnovski/mini.icons",
