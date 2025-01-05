@@ -1,0 +1,6 @@
+theme = "onedark"
+
+[editor]
+rulers = [100]
+cursorline = true
+cursorcolumn = true

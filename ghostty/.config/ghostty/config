@@ -1,0 +1,5 @@
+font-family = "JetBrains Mono"
+font-size = 13
+theme = Espresso
+command = fish --login -c "tmux attach || tmux"
+fullscreen = true
