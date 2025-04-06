@@ -58,7 +58,7 @@ vim.opt.pumheight = 20
 vim.opt.mousemodel = "extend"
 vim.opt.winborder = "rounded"
 
-vim.g.mapleader = " "
+vim.g.mapleader = ";"
 
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
@@ -409,6 +409,7 @@ require("lazy").setup({
             "ts_ls",
             "typos_lsp",
             "yamlls",
+            "zls",
          }) do
             lspconfig[server_name].setup({
                capabilities = vim.deepcopy(client_capabilities),
