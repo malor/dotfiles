@@ -57,7 +57,7 @@ vim.opt.mousemodel = "extend"
 vim.opt.mousescroll = "ver:3,hor:0"
 vim.opt.winborder = "rounded"
 
-vim.g.mapleader = " "
+vim.g.mapleader = ";"
 
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
@@ -399,6 +399,7 @@ require("lazy").setup({
             "ts_ls",
             "typos_lsp",
             "yamlls",
+            "zls",
          }
 
          for _, server_name in ipairs(servers) do
