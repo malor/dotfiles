@@ -21,7 +21,7 @@ vim.opt.smartcase = true
 vim.opt.showmode = false
 vim.opt.scrolloff = 3
 vim.opt.sidescrolloff = 3
-vim.opt.shortmess:append("c")
+vim.opt.shortmess:append({ a = true, s = true, c = true })
 vim.opt.title = true
 vim.opt.completeopt = { "menu", "menuone", "noselect", "noinsert" }
 vim.opt.updatetime = 300
@@ -29,7 +29,7 @@ vim.opt.colorcolumn = { 81, 101 }
 vim.opt.cursorline = true
 vim.opt.list = true
 vim.opt.listchars = {
-   tab      = "⇥-",
+   tab      = "--⇥",
    lead     = "·",
    trail    = "·",
    nbsp     = "␣",
@@ -44,9 +44,7 @@ vim.opt.wrap = false
 vim.opt.number = true
 vim.opt.signcolumn = "yes"
 vim.opt.expandtab = true
-vim.opt.formatoptions:append("r")
-vim.opt.formatoptions:append("n")
-vim.opt.formatoptions:remove("t")
+vim.opt.formatoptions:append({ r = true, n = true, t = false })
 vim.opt.swapfile = false
 vim.opt.shiftwidth = 4
 vim.opt.softtabstop = 4
@@ -56,9 +54,10 @@ vim.opt.undofile = true
 vim.opt.clipboard = "unnamedplus"
 vim.opt.pumheight = 20
 vim.opt.mousemodel = "extend"
+vim.opt.mousescroll = "ver:3,hor:0"
 vim.opt.winborder = "rounded"
 
-vim.g.mapleader = ";"
+vim.g.mapleader = " "
 
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
@@ -68,6 +67,14 @@ vim.g.loaded_perl_provider = 0
 vim.g.netrw_keepdir = 0
 vim.g.netrw_banner = 0
 vim.g.netrw_winsize = 15
+
+
+--
+-- // KEYMAPS //
+--
+
+vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlights" })
+vim.keymap.set("n", "<Leader>F", function() vim.lsp.buf.format() end, { desc = "Format" })
 
 
 --
@@ -100,7 +107,7 @@ end
 
 vim.api.nvim_create_autocmd("TextYankPost", {
    group = vim.api.nvim_create_augroup("MyTextYank", {}),
-   callback = function() require("vim.hl").on_yank() end,
+   callback = function() vim.hl.on_yank() end,
 })
 
 
@@ -121,13 +128,37 @@ vim.filetype.add({
 vim.api.nvim_create_augroup("MyFiletypeOptions", {})
 vim.api.nvim_create_autocmd("FileType", {
    group = "MyFiletypeOptions",
+   pattern = "*",
+   callback = function(args)
+      local language = vim.treesitter.language.get_lang(args.match)
+      if vim.treesitter.language.add(language) then
+         vim.treesitter.start(args.buf)
+      end
+   end,
+})
+vim.api.nvim_create_autocmd("FileType", {
+   group = "MyFiletypeOptions",
    pattern = "python",
-   command = "setlocal comments+=b:#:", -- '#:' sphinx docstrings comments
+   callback = function()
+      vim.opt_local.comments:append("b:#:") -- '#:' sphinx docstring comments
+   end
 })
 vim.api.nvim_create_autocmd("FileType", {
    group = "MyFiletypeOptions",
    pattern = "dosini",
-   command = "setlocal comments+=b:#", -- '#' common ini dialect
+   callback = function()
+      vim.opt_local.comments:append("b:#") -- '#' common ini dialect
+   end
+})
+vim.api.nvim_create_autocmd("FileType", {
+   group = "MyFiletypeOptions",
+   pattern = "lazy_backdrop",
+   callback = function(args)
+      -- Temporary hack to turn off backgrod border from Lazy.
+      -- See https://github.com/folke/lazy.nvim/issues/1951.
+      local win = vim.fn.win_findbuf(args.buf)[1]
+      vim.api.nvim_win_set_config(win, { border = "none" })
+   end,
 })
 
 
@@ -138,29 +169,31 @@ vim.api.nvim_create_autocmd("FileType", {
 vim.api.nvim_create_augroup("MyLspAttach", {})
 vim.api.nvim_create_autocmd("LspAttach", {
    group = "MyLspAttach",
-   callback = function(ev)
-      local lsp_client = vim.lsp.get_client_by_id(ev.data.client_id)
+   callback = function(args)
+      local lsp_client = vim.lsp.get_client_by_id(args.data.client_id)
 
       if lsp_client:supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight) then
          vim.api.nvim_create_autocmd("CursorHold", {
             group = "MyLspAttach",
-            callback = vim.lsp.buf.document_highlight,
-            buffer = ev.buf,
+            callback = function()
+               if vim.lsp.client_is_stopped(vim.lsp.get_clients()) ~= true then
+                  vim.lsp.buf.document_highlight()
+               end
+            end,
+            buffer = args.buf,
          })
          vim.api.nvim_create_autocmd("CursorMoved", {
             group = "MyLspAttach",
-            callback = vim.lsp.buf.clear_references,
-            buffer = ev.buf,
+            callback = function()
+               if vim.lsp.client_is_stopped(vim.lsp.get_clients()) ~= true then
+                  vim.lsp.buf.clear_references()
+               end
+            end,
+            buffer = args.buf,
          })
       end
    end,
 })
-
--- NeoVim only provides 'gq<motion>' and '<selection>gq' keymaps to invoke LSP
--- formatting. There's no easy way to LSP format an entire file. :(
-vim.keymap.set({ "n", "v" }, "<Leader>F", function()
-   vim.lsp.buf.format()
-end, { desc = "Auto-format a buffer" })
 
 
 --
@@ -208,75 +241,52 @@ require("lazy").setup({
    -- completion and built-in LSP. The priority must be higher than of lspconfig
    -- plugin, because its config updates LSP client capabilities.
    {
-      "hrsh7th/nvim-cmp",
+      "saghen/blink.cmp",
       priority = 100,
-      dependencies = {
-         "dcampos/cmp-snippy",
-         "hrsh7th/cmp-buffer",
-         "hrsh7th/cmp-nvim-lsp",
-         "hrsh7th/cmp-nvim-lsp-signature-help",
-         "hrsh7th/cmp-nvim-lua",
-         "hrsh7th/cmp-path",
-      },
-      config = function()
-         local cmp = require("cmp")
-         cmp.setup({
-            completion = {
-               completeopt = vim.o.completeopt,
-            },
-            window = {
-               documentation = cmp.config.window.bordered({ border = vim.o.winborder }),
-               completion = cmp.config.window.bordered({ border = vim.o.winborder }),
-            },
-            preselect = cmp.PreselectMode.None,
-            mapping = cmp.mapping.preset.insert(
-               {
-                  ["<C-b>"] = cmp.mapping.scroll_docs(-4),
-                  ["<C-f>"] = cmp.mapping.scroll_docs(4),
-                  ["<C-Space>"] = cmp.mapping.complete(),
-                  ["<Cr>"] = cmp.mapping.confirm(),
-               }
-            ),
-            formatting = {
-               format = function(_, vim_item)
-                  vim_item.menu = vim_item.kind
-                  vim_item.kind = MiniIcons.get("lsp", vim_item.kind)
-                  return vim_item
-               end
-            },
-            sources = cmp.config.sources({
-               { name = "nvim_lsp" },
-               { name = "nvim_lsp_signature_help" },
-               { name = "nvim_lua" },
-               { name = "buffer",                 keyword_length = 3 },
-               { name = "snippy" },
-               { name = "path" },
-            }),
-         })
-      end,
-   },
-
-   -- The snippet engine of choice.
-   {
-      "dcampos/nvim-snippy",
+      version = "1.*",
       opts = {
-         mappings = {
-            is = {
-               ["<Tab>"] = "expand_or_advance",
-               ["<S-Tab>"] = "previous",
+         cmdline = { enabled = false },
+         completion = {
+            accept = { auto_brackets = { enabled = false } },
+            documentation = { auto_show = true },
+            list = { selection = { preselect = false, auto_insert = false } },
+            menu = {
+               draw = {
+                  columns = {
+                     { "kind_icon", "label", "label_description", gap = 1 },
+                     { "kind" },
+                  },
+                  components = {
+                     kind_icon = {
+                        text = function(ctx)
+                           local kind_icon, _, _ = require('mini.icons').get('lsp', ctx.kind)
+                           return kind_icon
+                        end,
+                     },
+                  },
+               },
             },
+         },
+         keymap = {
+            preset = "default",
+            ["<Cr>"] = { "accept", "fallback" },
+         },
+         signature = { enabled = true },
+         sources = {
+            providers = { lsp = { fallbacks = {} }, buffer = { score_offset = -50 } },
+            min_keyword_length = 3,
          },
       },
    },
 
-   -- The collection of small QoL plugins for Neovim. First of all it provides
-   -- various pickers with preview window.
+   -- A collection of small quality-of-life plugins for Neovim, including
+   -- general fuzzy finders for files/symbols/etc., a file explorer,
+   -- indentation guides and much more.
    {
       "folke/snacks.nvim",
-      priority = 1000,
+      priority = 100,
       lazy = false,
       opts = {
-         indent = { scope = { enabled = false } },
          gitbrowse = {
             open = function(url)
                if IS_REMOTE_HOST then
@@ -286,11 +296,26 @@ require("lazy").setup({
                end
             end
          },
+         indent = {
+            scope = { enabled = false },
+         },
          picker = {
             sources = {
                explorer = {
                   auto_close = true,
                   diagnostics = false,
+                  win = {
+                     list = {
+                        keys = {
+                           ["<C-t>"] = { "tab", mode = { "n", "i" } },
+                        }
+                     }
+                  },
+               },
+               treesitter = {
+                  filter = {
+                     python = { "Class", "Function" },
+                  }
                }
             },
             win = {
@@ -298,56 +323,110 @@ require("lazy").setup({
                   keys = {
                      ["<Esc>"] = { "close", mode = { "n", "i" } },
                   }
+               },
+               preview = {
+                  wo = {
+                     number = false,
+                     signcolumn = "no",
+                  }
                }
-            }
+            },
          },
       },
       keys = {
-         { "<Leader>e", function() Snacks.explorer() end,                      desc = "Open file explorer" },
-         { "<Leader>G", function() Snacks.gitbrowse() end,                     desc = "Open git browser",                  mode = { "n", "v" } },
-         { "'",         function() Snacks.picker.marks() end,                  desc = "Open marks picker" },
-         { "<Leader>f", function() Snacks.picker.git_files() end,              desc = "Open file picker" },
-         { "<Leader>/", function() Snacks.picker.grep() end,                   desc = "Open search in workspace directory" },
-         { "<Leader>b", function() Snacks.picker.buffers() end,                desc = "Open buffer picker" },
-         { "<Leader>.", function() Snacks.picker.grep_word() end,              desc = "Open search of selection",          mode = { "n", "x" } },
-         { "<Leader>'", function() Snacks.picker.resume() end,                 desc = "Open last picker" },
-         { "<Leader>?", function() Snacks.picker.commands() end,               desc = "Open command palette" },
-         { "<Leader>d", function() Snacks.picker.diagnostics_buffer() end,     desc = "Open diagnostic picker" },
-         { "<Leader>g", function() Snacks.picker.git_status() end,             desc = "Open changed file picker" },
-         { "<Leader>H", function() Snacks.toggle.inlay_hints():toggle() end,   desc = "Toggle inlay hints" },
-         { "<Leader>3", function() Snacks.toggle.option("spell"):toggle() end, desc = "Toggle spelling" },
-         { "gd",        function() Snacks.picker.lsp_definitions() end,        desc = "Goto definition" },
-         { "gD",        function() Snacks.picker.lsp_declarations() end,       desc = "Goto declarations" },
-         { "grr",       function() Snacks.picker.lsp_references() end,         desc = "Goto references" },
-         { "gi",        function() Snacks.picker.lsp_implementations() end,    desc = "Goto implementation" },
-         { "gy",        function() Snacks.picker.lsp_type_definitions() end,   desc = "Goto type definition" },
-         { "<Leader>s", function() Snacks.picker.lsp_symbols() end,            desc = "Open symbol picker" },
-         { "<Leader>S", function() Snacks.picker.lsp_workspace_symbols() end,  desc = "Open workspace symbol picker" },
+         { "<Leader>e", function() Snacks.explorer({ cwd = vim.fn.expand("%:p:h") }) end, desc = "Open file explorer" },
+         { "<Leader>G", function() Snacks.gitbrowse() end,                                desc = "Open git browser",                  mode = { "n", "v" } },
+         { "'",         function() Snacks.picker.marks() end,                             desc = "Open marks picker" },
+         { "<Leader>f", function() Snacks.picker.git_files({ untracked = true }) end,     desc = "Open file picker" },
+         { "<Leader>/", function() Snacks.picker.grep() end,                              desc = "Open search in workspace directory" },
+         { "<Leader>b", function() Snacks.picker.buffers() end,                           desc = "Open buffer picker" },
+         { "<Leader>.", function() Snacks.picker.grep_word() end,                         desc = "Open search of selection",          mode = { "n", "x" } },
+         { "<Leader>'", function() Snacks.picker.resume() end,                            desc = "Open last picker" },
+         { "<Leader>?", function() Snacks.picker.commands() end,                          desc = "Open command palette" },
+         { "<Leader>d", function() Snacks.picker.diagnostics_buffer() end,                desc = "Open diagnostic picker" },
+         { "<Leader>g", function() Snacks.picker.git_status() end,                        desc = "Open changed file picker" },
+         { "<Leader>H", function() Snacks.toggle.inlay_hints():toggle() end,              desc = "Toggle inlay hints" },
+         { "<Leader>3", function() Snacks.toggle.option("spell"):toggle() end,            desc = "Toggle spelling" },
+         { "gd",        function() Snacks.picker.lsp_definitions() end,                   desc = "Goto definition" },
+         { "gD",        function() Snacks.picker.lsp_declarations() end,                  desc = "Goto declarations" },
+         { "grr",       function() Snacks.picker.lsp_references() end,                    desc = "Goto references" },
+         { "gi",        function() Snacks.picker.lsp_implementations() end,               desc = "Goto implementation" },
+         { "gy",        function() Snacks.picker.lsp_type_definitions() end,              desc = "Goto type definition" },
+         { "<Leader>s", function() Snacks.picker.lsp_symbols() end,                       desc = "Open symbol picker" },
+         { "<Leader>S", function() Snacks.picker.lsp_workspace_symbols() end,             desc = "Open workspace symbol picker" },
+         { "<Leader>q", function() Snacks.picker.treesitter() end,                        desc = "Open symbol picker" },
+      },
+   },
 
+   -- Lets you navigate your code with search labels, enhanced character
+   -- motions, and Treesitter integration.
+   {
+      "folke/flash.nvim",
+      event = "VeryLazy",
+      opts = {
+         modes = { char = { enabled = false } },
+         prompt = { enabled = false },
+      },
+      keys = {
+         { "s", mode = { "n", "x", "o" }, function() require("flash").jump() end,              desc = "Flash" },
+         { "S", mode = { "n", "x", "o" }, function() require("flash").treesitter() end,        desc = "Flash Treesitter" },
+         { "r", mode = { "o" },           function() require("flash").remote() end,            desc = "Remote Flash" },
+         { "R", mode = { "o", "x" },      function() require("flash").treesitter_search() end, desc = "Treesitter Search" },
       },
    },
 
    -- LSP and its goodies.
    {
       "neovim/nvim-lspconfig",
-      dependencies = { "hrsh7th/cmp-nvim-lsp", "b0o/SchemaStore.nvim" },
+      dependencies = { "b0o/SchemaStore.nvim" },
       config = function()
-         local lspconfig = require("lspconfig")
-         local server_settings = {
-            pyright = {
+         local servers = {
+            "bashls",
+            "clangd",
+            "cssls",
+            "dotls",
+            "gopls",
+            "html",
+            "jsonls",
+            "just",
+            "lua_ls",
+            "marksman",
+            "pyright",
+            "ruff",
+            "rust_analyzer",
+            "sourcekit",
+            "taplo",
+            "ts_ls",
+            "typos_lsp",
+            "yamlls",
+         }
+
+         for _, server_name in ipairs(servers) do
+            vim.lsp.enable(server_name)
+         end
+
+         vim.lsp.config("clangd", {
+            -- Header insertions are nasty and rarely work for me. Since clangd
+            -- 21, they can be disabled via clangd’s own configuration file.
+            -- Until it's available in Arch Linux, I have no choice but to
+            -- maintain this setting here.
+            cmd = { "clangd", "--header-insertion=never" },
+         })
+
+         vim.lsp.config("pyright", {
+            settings = {
                pyright = {
                   disableOrganizeImports = true,
                },
                python = {
                   analysis = {
                      autoImportCompletions = false,
-                     diagnosticSeverityOverrides = {
-                        -- reportIncompatibleMethodOverride = false,
-                     },
                   },
                },
             },
-            ts_ls = {
+         })
+         vim.lsp.config("ts_ls", {
+            settings = {
                typescript = {
                   inlayHints = {
                      includeInlayParameterNameHints = "all",
@@ -371,52 +450,27 @@ require("lazy").setup({
                   },
                },
             },
-            lua_ls = {
+         })
+         vim.lsp.config("lua_ls", {
+            settings = {
                Lua = {
                   hint = {
                      enable = true,
                   },
                },
             },
-            jsonls = {
+         })
+         vim.lsp.config("jsonls", {
+            settings = {
                json = {
                   schemas = require("schemastore").json.schemas(),
                   validate = { enable = true },
                },
             },
-         }
-         local client_capabilities = vim.tbl_deep_extend(
-            "force",
-            vim.lsp.protocol.make_client_capabilities(),
-            require("cmp_nvim_lsp").default_capabilities()
-         )
+         })
 
-         for _, server_name in ipairs({
-            "bashls",
-            "clangd",
-            "cssls",
-            "dotls",
-            "gopls",
-            "html",
-            "jsonls",
-            "lua_ls",
-            "marksman",
-            "pyright",
-            "ruff",
-            "rust_analyzer",
-            "sourcekit",
-            "taplo",
-            "ts_ls",
-            "typos_lsp",
-            "yamlls",
-            "zls",
-         }) do
-            lspconfig[server_name].setup({
-               capabilities = vim.deepcopy(client_capabilities),
-               settings = server_settings[server_name] or vim.empty_dict(),
-               silent = true,
-            })
-         end
+         vim.keymap.set("n", "gA", "<Cmd>LspClangdSwitchSourceHeader<Cr>", { desc = "Switch between source/header" })
+         vim.keymap.set("n", "gS", "<Cmd>LspClangdShowSymbolInfo<Cr>", { desc = "Show symbol info" })
       end,
    },
 
@@ -425,32 +479,23 @@ require("lazy").setup({
    -- syntax highlighting, indentation, navigation, etc.
    {
       "nvim-treesitter/nvim-treesitter",
+      lazy = false,
+      branch = "main",
       build = ":TSUpdate",
-      config = function()
-         require("nvim-treesitter.configs").setup({
-            highlight = { enable = true },
-            incremental_selection = {
-               enable = true,
-               keymaps = {
-                  init_selection = "<C-Space>",
-                  scope_incremental = "<C-Space>",
-               },
-            },
-         })
-      end,
    },
 
    -- Non default colorschemes and their configurations.
    {
       "gbprod/nord.nvim",
       priority = 200,
-      config = function()
-         require("nord").setup({
-            diff = { mode = "fg" },
-            styles = {
-               comments = { italic = false },
-            }
-         })
+      opts = {
+         diff = { mode = "fg" },
+         styles = {
+            comments = { italic = false },
+         }
+      },
+      config = function(_, opts)
+         require("nord").setup(opts)
          vim.cmd.colorscheme("nord")
       end,
    },
@@ -501,7 +546,7 @@ require("lazy").setup({
                         -- UTF-8 is the de-facto standard encoding and is what
                         -- most users expect by default. There's no need to
                         -- show encoding unless it's something else.
-                        local fenc = vim.opt.fenc:get()
+                        local fenc = vim.opt_local.fenc:get()
                         return string.len(fenc) > 0 and string.lower(fenc) ~= "utf-8"
                      end,
                   },
@@ -525,10 +570,10 @@ require("lazy").setup({
          close_on_select = true,
          show_guides = true,
       },
-      config = function(self, opts)
-         require("aerial").setup(opts)
-         vim.keymap.set("n", "<Leader>2", "<Cmd>AerialToggle!<Cr>", { desc = "Toggle code outline" })
-      end,
+      keys = {
+         -- { "<Leader>2", "<Cmd>AerialToggle!<Cr>", desc = "Toggle code outline" },
+      },
+      lazy = false,
    },
    {
       "folke/which-key.nvim",
@@ -539,13 +584,15 @@ require("lazy").setup({
             -- useful anyway.
             return mapping.desc and mapping.desc ~= ""
          end,
+         spec = {
+            { "<Leader>h", group = "Git [H]unk" }
+         }
       },
    },
    {
       "lewis6991/gitsigns.nvim",
       opts = {
          preview_config = {
-            border = vim.o.winborder,
             focusable = false,
          },
          on_attach = function(buffer)
@@ -558,25 +605,34 @@ require("lazy").setup({
                vim.keymap.set("n", "[c", gitsigns.prev_hunk, { buffer = buffer, desc = "Goto previous change" })
             end
 
-            vim.keymap.set({ "n", "v" }, "<Leader>hs", gitsigns.stage_hunk,
-               { buffer = buffer, desc = "Stage current hunk" })
-            vim.keymap.set({ "n", "v" }, "<Leader>hr", gitsigns.reset_hunk,
-               { buffer = buffer, desc = "Revert current hunk" })
-            vim.keymap.set("n", "<Leader>hu", gitsigns.undo_stage_hunk,
-               { buffer = buffer, desc = "Unstage current hunk" })
-            vim.keymap.set("n", "<Leader>hp", gitsigns.preview_hunk,
-               { buffer = buffer, desc = "Show current hunk" })
-            vim.keymap.set("n", "<Leader>hb", function() gitsigns.blame_line { full = true } end,
-               { buffer = buffer, desc = "Blame current line" })
-            vim.keymap.set("n", "<Leader>hd", function() gitsigns.diffthis("~") end,
-               { buffer = buffer, desc = "Show current file diff" })
+            vim.keymap.set("n", "<Leader>hs", function()
+               gitsigns.stage_hunk()
+            end, { buffer = buffer, desc = "Stage hunk under cursor" })
+
+            vim.keymap.set("v", "<Leader>hs", function()
+               gitsigns.stage_hunk({ vim.fn.line("."), vim.fn.line("v") })
+            end, { buffer = buffer, desc = "Stage selected hunk" })
+
+            vim.keymap.set("n", "<Leader>hr", function()
+               gitsigns.reset_hunk()
+            end, { buffer = buffer, desc = "Revert hunk under cursor" })
+
+            vim.keymap.set("v", "<Leader>hr", function()
+               gitsigns.reset_hunk({ vim.fn.line('.'), vim.fn.line('v') })
+            end, { buffer = buffer, desc = "Revert selected hunk" })
+
+            vim.keymap.set("n", "<Leader>hp", function()
+               gitsigns.preview_hunk()
+            end, { buffer = buffer, desc = "Show current hunk" })
+
+            vim.keymap.set("n", "<Leader>hb", function()
+               gitsigns.blame_line({ full = true })
+            end, { buffer = buffer, desc = "Blame current line" })
          end,
       },
    },
-   {
-      "brenoprata10/nvim-highlight-colors",
-      opts = {},
-   },
+
+   -- Nerd icons for everything we need.
    {
       "echasnovski/mini.icons",
       opts = {
@@ -584,13 +640,14 @@ require("lazy").setup({
             ["function"] = { glyph = "󰊕" },
          },
       },
-      config = function(self, opts)
+      config = function(_, opts)
          require("mini.icons").setup(opts)
          MiniIcons.mock_nvim_web_devicons()
       end,
    },
+
+   { "brenoprata10/nvim-highlight-colors", opts = {} },
    { "tpope/vim-sleuth" },
-   { "mg979/vim-visual-multi" },
    {
       "williamboman/mason.nvim",
       opts = {},
@@ -598,6 +655,8 @@ require("lazy").setup({
    },
 }, {
    lockfile = vim.fn.stdpath("data") .. "/lazy-lock.json",
+   install = { colorscheme = { "nord" } },
+   ui = { border = vim.o.winborder },
 })
 
 
